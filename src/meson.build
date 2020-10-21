@@ -5,8 +5,7 @@ else
 endif
 
 libghost_sources = [
-  'Ghost.vala',
-  'JWT.vala'
+  'Ghost.vala'
 ]
 
 

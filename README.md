@@ -2,6 +2,8 @@
 
 Unofficial [Ghost](https://ghost.org/) API client library for Vala. Still a work in progress.
 
+This is a simple API for publishing from [ThiefMD](https://thiefmd.com), and will hopefully become fully compatible with time.
+
 ## Compilation
 
 I recommend including `ghost-vala` as a git submodule and adding `ghost-vala/src/Ghost.vala` to your sources list. This will avoid packaging conflicts and remote build system issues until I learn a better way to suggest this.
