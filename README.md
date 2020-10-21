@@ -22,7 +22,7 @@ meson build
 cd build
 meson configure -Denable_examples=true
 ninja
-./examples/hello-writeas
+./examples/hello-ghost
 ```
 
 Examples require update to username and password, don't check this in
