@@ -36,3 +36,42 @@ string password = "password";
 
 # Quick Start
 
+## Authentication
+
+```vala
+Ghost.Client client = Client (url, username, password);
+if (client.authenticate ()) {
+    print ("You logged in!");
+}
+```
+
+## Simple Post
+
+```vala
+Ghost.Client client = Client (url, username, password);
+
+string id;
+string slug;
+if (client.create_post_simple (out slug,
+    out id,
+    "Hello world",
+    "<p>Hello ghost</p>"))
+{
+    print ("New post at %s/%s", url, slug);
+}
+```
+
+## Simple Image Upload
+
+```vala
+Ghost.Client client = Client (url, username, password);
+
+string id;
+string slug;
+if (client.upload_image_simple (
+    out file_url,
+    "/home/user/Pictures/photo.jpeg"))
+{
+    print ("New image at %s", file_url);
+}
+```
