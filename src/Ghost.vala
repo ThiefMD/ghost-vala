@@ -50,6 +50,73 @@ namespace Ghost {
             return (cookies.length () != 0);
         }
 
+        public bool upload_image_simple (
+            out string file_url,
+            string local_file_path
+        )
+        {
+            bool success = false;
+            file_url = "";
+            File upload_file = File.new_for_path (local_file_path);
+            string file_mimetype = "application/octet-stream";
+
+            if (!upload_file.query_exists ()) {
+                warning ("Invalid file provided");
+                return false;
+            }
+
+            uint8[] file_data;
+            try {
+                GLib.FileUtils.get_data(local_file_path, out file_data);
+            } catch (GLib.FileError e) {
+                warning(e.message);
+                return false;
+            }
+
+            bool uncertain = false;
+            string? st = ContentType.guess (upload_file.get_basename (), file_data, out uncertain);
+            if (!uncertain || st != null) {
+                file_mimetype = ContentType.get_mime_type (st);
+            }
+
+            debug ("Will upload %s : %s", file_mimetype, local_file_path);
+
+            Soup.Buffer buffer = new Soup.Buffer.take(file_data);
+            Soup.Multipart multipart = new Soup.Multipart("multipart/form-data");
+            multipart.append_form_file ("file", upload_file.get_path (), file_mimetype, buffer);
+            // multipart.append_form_string ("ref", Soup.URI.encode(upload_file.get_basename ()), file_mimetype, buffer);
+
+            WebCall call = new WebCall (endpoint, API_ENDPOINT + IMAGE + "/upload");
+            call.set_multipart (multipart);
+            call.add_header ("Origin", origin_dat);
+            call.add_cookies (cookies);
+            call.perform_call ();
+
+            if (call.response_code >= 200 && call.response_code < 300) {
+                success = true;
+            }
+
+            try {
+                var parser = new Json.Parser ();
+                parser.load_from_data (call.response_str);
+                var json_obj = parser.get_root ().get_object ();
+                if (json_obj.has_member ("images")) {
+                    var image_data = json_obj.get_array_member ("images");
+                    foreach (var p in image_data.get_elements ()) {
+                        var ip = p.get_object ();
+                        if (ip.has_member ("url")) {
+                            success = true;
+                            file_url = ip.get_string_member ("url");
+                        }
+                    }
+                }
+            } catch (Error e) {
+                warning ("Error parsing response: %s", e.message);
+            }
+
+            return success;
+        }
+
         public bool create_post_simple (
             out string slug,
             out string id,
@@ -101,7 +168,6 @@ namespace Ghost {
             try {
                 var parser = new Json.Parser ();
                 parser.load_from_data (call.response_str);
-                Json.Node data = parser.get_root ();
                 var json_obj = parser.get_root ().get_object ();
                 if (json_obj.has_member ("posts")) {
                     var posts_data = json_obj.get_array_member ("posts");
@@ -130,6 +196,7 @@ namespace Ghost {
         private Soup.Message message;
         private string url;
         private string body;
+        private bool is_mime = false;
 
         public string response_str;
         public uint response_code;
@@ -142,6 +209,11 @@ namespace Ghost {
 
         public void set_body (string data) {
             body = data;
+        }
+
+        public void set_multipart (Soup.Multipart multipart) {
+            message = Soup.Form.request_new_from_multipart (url, multipart);
+            is_mime = true;
         }
 
         public void set_get () {
@@ -174,7 +246,11 @@ namespace Ghost {
             if (body != "") {
                 message.set_request ("application/json", Soup.MemoryUse.STATIC, body.data);
             } else {
-                add_header ("Content-Type", "application/json");
+                if (!is_mime) {
+                    add_header ("Content-Type", "application/json");
+                } else {
+                    add_header ("Content-Type", Soup.FORM_MIME_TYPE_MULTIPART);
+                }
             }
 
             session.send_message (message);

@@ -9,11 +9,19 @@ public class HelloGhost {
         string slug;
         client.authenticate ();
 
+        string file_url;
+        if (client.upload_image_simple (
+            out file_url,
+            "/home/kmwallio/Pictures/bread.jpeg"))
+        {
+            print ("\n\n** New image at %s\n\n", file_url);
+        }
+
         if (client.create_post_simple(
             out slug,
             out id,
             "Hello world",
-            "<p>Hello ghost</p>"))
+            "<p>Hello ghost</p><img src='%s' />".printf (file_url)))
         {
             print ("\n\n** New post at %s/%s\n\n", endpoint, slug);
         }
