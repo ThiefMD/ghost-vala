@@ -38,13 +38,13 @@ namespace Ghost {
             if (msg.status_code >= 200 && msg.status_code < 300) {
 
                 GLib.SList<Soup.Cookie> rec_cookies = Soup.cookies_from_response (msg);
-                warning ("Got success from server");
+                debug ("Got success from server");
                 foreach (var cookie in rec_cookies) {
                     if (cookie.name == COOKIE) {
                         cookies.append (cookie);
                     }
                 }
-                warning ("Found : %u cookies", cookies.length ());
+                debug ("Found : %u expected cookies", cookies.length ());
             }
 
             return (cookies.length () != 0);
