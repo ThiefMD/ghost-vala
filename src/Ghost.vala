@@ -122,7 +122,8 @@ namespace Ghost {
             out string id,
             string title,
             string html_body,
-            bool publish = true)
+            bool publish = true,
+            string cover_image_url = "")
         {
             bool success = false;
             slug = "";
@@ -138,6 +139,10 @@ namespace Ghost {
             builder.add_string_value (title);
             builder.set_member_name ("html");
             builder.add_string_value (html_body);
+            if (cover_image_url != "") {
+                builder.set_member_name ("feature_image");
+                builder.add_string_value (cover_image_url);
+            }
             builder.set_member_name ("status");
             if (publish) {
                 builder.add_string_value ("published");
