@@ -123,7 +123,8 @@ namespace Ghost {
             string title,
             string html_body,
             bool publish = true,
-            string cover_image_url = "")
+            string cover_image_url = "",
+            string[]? tags = null)
         {
             bool success = false;
             slug = "";
@@ -148,6 +149,15 @@ namespace Ghost {
                 builder.add_string_value ("published");
             } else {
                 builder.add_string_value ("draft");
+            }
+            if (tags != null && tags.length > 0) {
+                builder.set_member_name ("tags");
+                builder.begin_array ();
+                foreach (var tag in tags) {
+                    builder.add_string_value (tag);
+                }
+                builder.end_array ();
+
             }
             builder.end_object ();
             builder.end_array ();

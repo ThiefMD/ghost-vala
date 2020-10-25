@@ -21,7 +21,10 @@ public class HelloGhost {
             out slug,
             out id,
             "Hello world",
-            "<p>Hello ghost</p><img src='%s' />".printf (file_url)))
+            "<p>Hello ghost</p><img src='%s' />".printf (file_url),
+            false,
+            file_url,
+            {"Sample", "Post"}))
         {
             print ("\n\n** New post at %s/%s\n\n", endpoint, slug);
         }
