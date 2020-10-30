@@ -20,6 +20,10 @@ namespace Ghost {
                 endpoint = url + "/";
             }
 
+            if (!endpoint.has_prefix ("http")) {
+                endpoint = "https://" + endpoint;
+            }
+
             username = user;
             authenticated_user = token;
             origin_dat = ORIGIN + user;
@@ -257,6 +261,10 @@ namespace Ghost {
 
         public bool perform_call () {
             bool success = false;
+
+            if (message == null) {
+                return false;
+            }
 
             if (body != "") {
                 message.set_request ("application/json", Soup.MemoryUse.STATIC, body.data);
