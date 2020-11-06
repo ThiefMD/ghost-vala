@@ -51,6 +51,12 @@ namespace Ghost {
                 debug ("Found : %u expected cookies", cookies.length ());
             }
 
+            // Incase URL is valid but has ghost install path at the end
+            if (cookies.length () == 0 && endpoint.has_suffix ("ghost/")) {
+                endpoint = endpoint.substring (0, endpoint.length - 6);
+                return authenticate ();
+            }
+
             return (cookies.length () != 0);
         }
 
