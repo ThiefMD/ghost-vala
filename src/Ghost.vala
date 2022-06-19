@@ -36,20 +36,25 @@ namespace Ghost {
             msg.request_headers.append ("Origin", origin_dat);
             string login = "username=" + username + "&password=" + authenticated_user;
             msg.set_request ("application/x-www-form-urlencoded", Soup.MemoryUse.STATIC, login.data);
-            session.send_message (msg);
             cookies = new SList<Soup.Cookie> ();
+            MainLoop loop = new MainLoop ();
+            session.queue_message (msg, (sess, mess) => {
 
-            if (msg.status_code >= 200 && msg.status_code < 300) {
+                if (mess.status_code >= 200 && mess.status_code < 300) {
 
-                GLib.SList<Soup.Cookie> rec_cookies = Soup.cookies_from_response (msg);
-                debug ("Got success from server");
-                foreach (var cookie in rec_cookies) {
-                    if (cookie.name == COOKIE) {
-                        cookies.append (cookie);
+                    GLib.SList<Soup.Cookie> rec_cookies = Soup.cookies_from_response (mess);
+                    debug ("Got success from server");
+                    foreach (var cookie in rec_cookies) {
+                        if (cookie.name == COOKIE) {
+                            cookies.append (cookie);
+                        }
                     }
+                    debug ("Found : %u expected cookies", cookies.length ());
                 }
-                debug ("Found : %u expected cookies", cookies.length ());
-            }
+                loop.quit ();
+            });
+
+            loop.run ();
 
             // Incase URL is valid but has ghost install path at the end
             if (cookies.length () == 0 && endpoint.has_suffix ("ghost/")) {
@@ -282,20 +287,24 @@ namespace Ghost {
                 }
             }
 
-            session.send_message (message);
-            response_str = (string) message.response_body.flatten ().data;
-            response_code = message.status_code;
+            MainLoop loop = new MainLoop ();
+            session.queue_message (message, (sess, mess) => {;
+                response_str = (string) mess.response_body.flatten ().data;
+                response_code = mess.status_code;
 
-            if (response_str != null && response_str != "") {
-                success = true;
-                debug ("Non-empty body");
-            }
+                if (response_str != null && response_str != "") {
+                    success = true;
+                    debug ("Non-empty body");
+                }
 
-            if (response_code >= 200 && response_code <= 250) {
-                success = true;
-                debug ("Success HTTP code");
-            }
+                if (response_code >= 200 && response_code <= 250) {
+                    success = true;
+                    debug ("Success HTTP code");
+                }
+                loop.quit ();
+            });
 
+            loop.run ();
             return success;
         }
     }
