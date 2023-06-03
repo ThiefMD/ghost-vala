@@ -8,6 +8,8 @@ This is a simple API for publishing from [ThiefMD](https://thiefmd.com), and wil
 
 I recommend including `ghost-vala` as a git submodule and adding `ghost-vala/src/Ghost.vala` to your sources list. This will avoid packaging conflicts and remote build system issues until I learn a better way to suggest this.
 
+For libsoup3, use `ghost-vala/src/Ghost3.vala`.
+
 ### Requirements
 
 ```
