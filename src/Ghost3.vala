@@ -1,5 +1,6 @@
 namespace Ghost {
-    public const string API_ENDPOINT = "ghost/api/v3/admin/";
+    public const string API_ENDPOINT = "ghost/api/admin/";
+    public const string API_VERSION = "v5.0";
     public const string POST = "posts";
     public const string IMAGE = "images";
 
@@ -12,6 +13,7 @@ namespace Ghost {
         private string? authenticated_user;
         public string origin_dat;
         public SList<Soup.Cookie> cookies;
+        public bool requires_2fa { get; private set; default = false; }
 
         public Client (string url, string user, string token) {
             if (url.has_suffix ("/")) {
@@ -34,16 +36,19 @@ namespace Ghost {
             Soup.Session session = new Soup.Session ();
             Soup.Message msg = new Soup.Message ("POST", endpoint + API_ENDPOINT + "session/");
             msg.request_headers.append ("Origin", origin_dat);
+            msg.request_headers.append ("Accept-Version", API_VERSION);
             string login = "username=" + username + "&password=" + authenticated_user;
             Bytes login_data = new Bytes.take (login.data);
             msg.set_request_body_from_bytes ("application/x-www-form-urlencoded", login_data);
             cookies = new SList<Soup.Cookie> ();
+            requires_2fa = false;
             MainLoop loop = new MainLoop ();
 
             session.send_and_read_async.begin (msg, 0, null, (obj, res) => {
                 try {
                     var response = session.send_and_read_async.end (res);
 
+                    // Store cookies for both success and 2FA responses
                     if (msg.status_code >= 200 && msg.status_code < 300) {
 
                         GLib.SList<Soup.Cookie> rec_cookies = Soup.cookies_from_response (msg);
@@ -54,6 +59,21 @@ namespace Ghost {
                             }
                         }
                         debug ("Found : %u expected cookies", cookies.length ());
+                    } else if (msg.status_code == 403) {
+                        // Check if this is a 2FA requirement
+                        string response_str = response != null ? (string)response.get_data () : "";
+                        if (response_str != null && response_str.contains ("User must verify session to login")) {
+                            requires_2fa = true;
+                            // Save cookies for 2FA verification
+                            GLib.SList<Soup.Cookie> rec_cookies = Soup.cookies_from_response (msg);
+                            debug ("2FA required - got session cookie");
+                            foreach (var cookie in rec_cookies) {
+                                if (cookie.get_name() == COOKIE) {
+                                    cookies.append (cookie);
+                                }
+                            }
+                            debug ("Found : %u expected cookies for 2FA", cookies.length ());
+                        }
                     }
                 } catch (Error e) {
                     warning ("Error sending request: %s", e.message);
@@ -70,6 +90,71 @@ namespace Ghost {
             }
 
             return (cookies.length () != 0);
+        }
+
+        public bool verify_session (string auth_code) {
+            if (cookies.length () == 0) {
+                warning ("No session cookie available for verification");
+                return false;
+            }
+
+            Json.Builder builder = new Json.Builder ();
+            builder.begin_object ();
+            builder.set_member_name ("token");
+            builder.add_string_value (auth_code);
+            builder.end_object ();
+
+            Json.Generator generate = new Json.Generator ();
+            Json.Node root = builder.get_root ();
+            generate.set_root (root);
+            string request_body = generate.to_data (null);
+
+            WebCall call = new WebCall (endpoint, API_ENDPOINT + "session/verify");
+            call.set_put ();
+            call.add_header ("Origin", origin_dat);
+            call.add_cookies (cookies);
+            call.set_body (request_body);
+            call.perform_call ();
+
+            if (call.response_code >= 200 && call.response_code < 300) {
+                requires_2fa = false;
+                debug ("2FA verification successful");
+                return true;
+            }
+
+            warning ("2FA verification failed with status: %u", call.response_code);
+            return false;
+        }
+
+        public bool resend_verification () {
+            if (cookies.length () == 0) {
+                warning ("No session cookie available for resend");
+                return false;
+            }
+
+            Json.Builder builder = new Json.Builder ();
+            builder.begin_object ();
+            builder.end_object ();
+
+            Json.Generator generate = new Json.Generator ();
+            Json.Node root = builder.get_root ();
+            generate.set_root (root);
+            string request_body = generate.to_data (null);
+
+            WebCall call = new WebCall (endpoint, API_ENDPOINT + "session/verify");
+            call.set_post ();
+            call.add_header ("Origin", origin_dat);
+            call.add_cookies (cookies);
+            call.set_body (request_body);
+            call.perform_call ();
+
+            if (call.response_code >= 200 && call.response_code < 300) {
+                debug ("2FA code resent successfully");
+                return true;
+            }
+
+            warning ("2FA resend failed with status: %u", call.response_code);
+            return false;
         }
 
         public bool upload_image_simple (
@@ -273,6 +358,10 @@ namespace Ghost {
             message.request_headers.append (key, value);
         }
 
+        private void add_default_headers () {
+            add_header ("Accept-Version", API_VERSION);
+        }
+
         public void add_cookies (SList<Soup.Cookie> cookies) {
             Soup.cookies_to_request (cookies, message);
         }
@@ -283,6 +372,8 @@ namespace Ghost {
             if (message == null) {
                 return false;
             }
+
+            add_default_headers ();
 
             if (body != "") {
                 Bytes body_bytes = new Bytes.static (body.data);

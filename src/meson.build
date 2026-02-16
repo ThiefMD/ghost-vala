@@ -5,7 +5,7 @@ else
 endif
 
 libghost_sources = [
-  'Ghost.vala'
+  'Ghost3.vala'
 ]
 
 

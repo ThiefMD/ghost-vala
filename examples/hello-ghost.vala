@@ -9,6 +9,12 @@ public class HelloGhost {
         string slug;
         client.authenticate ();
 
+        // Check if 2FA is needed (basic check - see hello-ghost-2fa.vala for full example)
+        if (client.requires_2fa) {
+            print ("2FA required! Please check your email and run the 2FA example.\n");
+            return 1;
+        }
+
         string file_url;
         if (client.upload_image_simple (
             out file_url,

@@ -4,6 +4,10 @@ Unofficial [Ghost](https://ghost.org/) API client library for Vala. Still a work
 
 This is a simple API for publishing from [ThiefMD](https://thiefmd.com), and will hopefully become fully compatible with time.
 
+**Now with 2FA support!** The library automatically detects when two-factor authentication is required and provides methods to complete the verification process.
+
+**Current API Version:** Ghost Admin API v5.0
+
 ## Compilation
 
 I recommend including `ghost-vala` as a git submodule and adding `ghost-vala/src/Ghost.vala` to your sources list. This will avoid packaging conflicts and remote build system issues until I learn a better way to suggest this.
@@ -46,6 +50,40 @@ if (client.authenticate ()) {
     print ("You logged in!");
 }
 ```
+
+## Two-Factor Authentication (2FA)
+
+If your Ghost site has 2FA enabled, the library automatically detects it and provides the verification flow:
+
+```vala
+Ghost.Client client = Client (url, username, password);
+client.authenticate ();
+
+if (client.requires_2fa) {
+    print ("2FA required! Check your email for the code.\n");
+    
+    // Get the verification code from user input
+    string auth_code = get_verification_code_from_user ();
+    
+    if (client.verify_session (auth_code)) {
+        print ("Successfully verified! You're now logged in.\n");
+    } else {
+        print ("Verification failed.\n");
+    }
+}
+```
+
+You can also resend the verification code if needed:
+
+```vala
+if (client.requires_2fa) {
+    if (client.resend_verification ()) {
+        print ("Verification code resent to your email.\n");
+    }
+}
+```
+
+See `examples/hello-ghost-2fa.vala` for a complete interactive example.
 
 ## Simple Post
 
