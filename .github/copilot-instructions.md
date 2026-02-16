@@ -39,17 +39,3 @@ Please follow these guidelines when contributing:
   * Prefer ASCII text unless the file already uses non-ASCII characters.
   * Keep naming consistent with nearby code.
   * Avoid introducing new dependencies unless requested.
-
-## Build and Test
-
-  * Configure: `meson setup build`
-  * Build: `meson compile -C build`
-  * Run tests: `meson test -C build`
-  * Run the app: `./build/com.github.kmwallio.thiefmd`
-
-## Flatpak Build and Test
-
-  * Prereqs: `org.gnome.Platform//49` and `org.gnome.Sdk//49`
-  * Change directory: `cd flatpak`
-  * Build/install: `flatpak-builder --force-clean --user --install build-dir com.github.kmwallio.thiefmd.json`
-  * Run: `flatpak run com.github.kmwallio.thiefmd`
