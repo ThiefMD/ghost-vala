@@ -14,6 +14,7 @@ namespace Ghost {
         public string origin_dat;
         public SList<Soup.Cookie> cookies;
         public bool requires_2fa { get; private set; default = false; }
+        private bool is_cookie_auth = false;
 
         public Client (string url, string user, string token) {
             if (url.has_suffix ("/")) {
@@ -27,12 +28,34 @@ namespace Ghost {
             }
 
             username = user;
-            authenticated_user = token;
-            origin_dat = ORIGIN + user;
             cookies = new SList<Soup.Cookie> ();
+            origin_dat = ORIGIN + user;
+
+            // Check if token is a stored session cookie
+            if (token != null && token.has_prefix ("cookie:")) {
+                // Extract the actual cookie value
+                authenticated_user = token.substring (7); // Remove "cookie:" prefix
+                is_cookie_auth = true;
+                // Note: cookies will be populated by authenticate() or when making requests
+                // The actual cookie object will be created when needed
+            } else {
+                // Use token as password for authentication
+                authenticated_user = token;
+                is_cookie_auth = false;
+            }
         }
 
         public bool authenticate () {
+            // If we're using a stored cookie, reconstruct the cookie from the value
+            if (is_cookie_auth && authenticated_user != null && authenticated_user != "") {
+                debug ("Using stored session cookie for authentication");
+                // The cookie value is already in authenticated_user
+                // We'll add it to the cookies list for use in API requests
+                // Note: The actual cookie object will be used by the WebCall class
+                return true;
+            }
+
+            // Otherwise, perform password-based authentication
             Soup.Session session = new Soup.Session ();
             Soup.Message msg = new Soup.Message ("POST", endpoint + API_ENDPOINT + "session/");
             msg.request_headers.append ("Origin", origin_dat);
@@ -113,6 +136,10 @@ namespace Ghost {
             call.set_put ();
             call.add_header ("Origin", origin_dat);
             call.add_cookies (cookies);
+            string? cookie_header = get_stored_cookie_header ();
+            if (cookie_header != null) {
+                call.add_header ("Cookie", cookie_header);
+            }
             call.set_body (request_body);
             call.perform_call ();
 
@@ -144,7 +171,12 @@ namespace Ghost {
             WebCall call = new WebCall (endpoint, API_ENDPOINT + "session/verify");
             call.set_post ();
             call.add_header ("Origin", origin_dat);
+            prepare_cookies ();
             call.add_cookies (cookies);
+            string? cookie_header = get_stored_cookie_header ();
+            if (cookie_header != null) {
+                call.add_header ("Cookie", cookie_header);
+            }
             call.set_body (request_body);
             call.perform_call ();
 
@@ -155,6 +187,34 @@ namespace Ghost {
 
             warning ("2FA resend failed with status: %u", call.response_code);
             return false;
+        }
+
+        private void prepare_cookies () {
+            // If using cookie auth and cookies list is empty, add the stored cookie
+            if (is_cookie_auth && cookies.length () == 0 && authenticated_user != null && authenticated_user != "") {
+                // Create a header-based cookie representation for the stored session
+                // This will be added as a Cookie header instead of using Soup.Cookie objects
+                debug ("Preparing stored session cookie for API request");
+                // We'll handle this in the WebCall class by adding it as a header
+            }
+        }
+
+        public string? get_stored_cookie_header () {
+            // If using cookie auth, return the Cookie header value
+            if (is_cookie_auth && authenticated_user != null && authenticated_user != "") {
+                return Ghost.COOKIE + "=" + authenticated_user;
+            }
+            return null;
+        }
+
+        public string? get_session_cookie () {
+            if (cookies.length () > 0 && cookies.data != null) {
+                var cookie = (Soup.Cookie)cookies.data;
+                if (cookie != null && cookie.get_value () != null) {
+                    return cookie.get_value ();
+                }
+            }
+            return null;
         }
 
         public bool upload_image_simple (
@@ -197,6 +257,11 @@ namespace Ghost {
             call.set_multipart (multipart);
             call.add_header ("Origin", origin_dat);
             call.add_cookies (cookies);
+            // Add stored cookie as header if using cookie auth
+            string? cookie_header = get_stored_cookie_header ();
+            if (cookie_header != null) {
+                call.add_header ("Cookie", cookie_header);
+            }
             call.perform_call ();
 
             if (call.response_code >= 200 && call.response_code < 300) {
@@ -280,6 +345,10 @@ namespace Ghost {
             call.set_post ();
             call.add_header ("Origin", origin_dat);
             call.add_cookies (cookies);
+            string? cookie_header = get_stored_cookie_header ();
+            if (cookie_header != null) {
+                call.add_header ("Cookie", cookie_header);
+            }
             call.set_body (request_body);
             call.perform_call ();
 

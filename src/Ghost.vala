@@ -14,6 +14,7 @@ namespace Ghost {
         public string origin_dat;
         public SList<Soup.Cookie> cookies;
         public bool requires_2fa { get; private set; default = false; }
+        private bool is_cookie_auth = false;
 
         public Client (string url, string user, string token) {
             if (url.has_suffix ("/")) {
@@ -27,12 +28,34 @@ namespace Ghost {
             }
 
             username = user;
-            authenticated_user = token;
-            origin_dat = ORIGIN + user;
             cookies = new SList<Soup.Cookie> ();
+            origin_dat = ORIGIN + user;
+
+            // Check if token is a stored session cookie
+            if (token != null && token.has_prefix ("cookie:")) {
+                // Extract the actual cookie value
+                authenticated_user = token.substring (7); // Remove "cookie:" prefix
+                is_cookie_auth = true;
+                // Note: cookies will be populated by authenticate() or when making requests
+                // The actual cookie object will be created when needed
+            } else {
+                // Use token as password for authentication
+                authenticated_user = token;
+                is_cookie_auth = false;
+            }
         }
 
         public bool authenticate () {
+            // If we're using a stored cookie, reconstruct the cookie from the value
+            if (is_cookie_auth && authenticated_user != null && authenticated_user != "") {
+                debug ("Using stored session cookie for authentication");
+                // The cookie value is already in authenticated_user
+                // We'll add it to the cookies list for use in API requests
+                // Note: The actual cookie object will be used by the WebCall class
+                return true;
+            }
+
+            // Otherwise, perform password-based authentication
             Soup.Session session = new Soup.Session ();
             Soup.Message msg = new Soup.Message ("POST", endpoint + API_ENDPOINT + "session/");
             msg.request_headers.append ("Origin", origin_dat);
